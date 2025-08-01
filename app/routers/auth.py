@@ -9,12 +9,86 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from app.models.user import User
 from app.schemas import CreateUser
 from app.backend.db_depends import get_db
+from datetime import datetime, timedelta, timezone
+import jwt
 
 
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
+SECRET_KEY = '08c595c5c41cfa4f709b4a6d7580f1da5382cc5b6cb5948701143cc66808af1b'
+ALGORITHM = 'HS256'
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str | None = payload.get('sub')
+        user_id: int | None = payload.get('id')
+        is_admin: bool | None = payload.get('is_admin')
+        is_supplier: bool | None = payload.get('is_supplier')
+        is_customer: bool | None = payload.get('is_customer')
+        expire: int | None = payload.get('exp')
+
+        if username is None or user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Could not validate user'
+            )
+        if expire is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No access token supplied"
+            )
+
+        if not isinstance(expire, int):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid token format"
+            )
+
+        # Проверка срока действия токена
+        current_time = datetime.now(timezone.utc).timestamp()
+
+        if expire < current_time:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired!"
+            )
+
+        return {
+            'username': username,
+            'id': user_id,
+            'is_admin': is_admin,
+            'is_supplier': is_supplier,
+            'is_customer': is_customer,
+        }
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired!"
+        )
+    except jwt.exceptions:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Could not validate user'
+        )
+
+async def create_access_token(username: str, user_id: int, is_admin: bool, is_supplier: bool, is_customer: bool,
+                              expires_delta: timedelta):
+    payload = {
+        'sub': username,
+        'id': user_id,
+        'is_admin': is_admin,
+        'is_supplier': is_supplier,
+        'is_customer': is_customer,
+        'exp': datetime.now(timezone.utc) + expires_delta
+    }
+
+    # Преобразование datetime в timestamp (количество секунд с начала эпохи)
+    payload['exp'] = int(payload['exp'].timestamp())
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post('/')
 async def create_user(db: Annotated[AsyncSession, Depends(get_db)], create_user: CreateUser):
@@ -41,18 +115,19 @@ async def authenticate_user(db: Annotated[AsyncSession, Depends(get_db)], userna
         )
     return user
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
 
 @router.post('/token')
 async def login(db: Annotated[AsyncSession, Depends(get_db)], form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = await authenticate_user(db, form_data.username, form_data.password)
 
+    token = await create_access_token(user.username, user.id, user.is_admin, user.is_supplier, user.is_customer,
+                                expires_delta=timedelta(minutes=20))
     return {
-        'access_token': user.username,
+        'access_token': token,
         'token_type': 'bearer'
     }
 
 @router.get('/read_current_user')
-async def read_current_user(user: str = Depends(oauth2_scheme)):
-    return user
+async def read_current_user(user: dict = Depends(get_current_user)):
+    return {'User': user}
+
