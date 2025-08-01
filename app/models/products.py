@@ -19,3 +19,4 @@ class Product(Base):
     is_active = Column(Boolean, default=True)
 
     category = relationship('Category', back_populates='products', uselist=False)
+    reviews = relationship('Reviews', back_populates='products', uselist=False)
