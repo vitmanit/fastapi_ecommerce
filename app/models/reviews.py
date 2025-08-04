@@ -13,6 +13,3 @@ class Review(Base):
     comment_date = Column(DateTime, default=datetime.utcnow)
     grade = Column(Integer)
     is_active = Column(Boolean, default=True)
-
-    user = relationship("User", back_populates="reviews")
-    product = relationship("Product", back_populates="reviews")

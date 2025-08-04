@@ -21,6 +21,10 @@ class CreateUser(BaseModel):
     email: EmailStr
     password: str
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
 class CreateReview(BaseModel):
     grade: int
     comment: str
