@@ -9,3 +9,14 @@ services:
     # Открываем порт 8000 внутри и снаружи
     ports:
       - 8000:8000
+  db:
+    image: postgres:17
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=ecommerce
+      - POSTGRES_PASSWORD=!Admin123
+      - POSTGRES_DB=ecommerce
+
+volumes:
+  postgres_data:
