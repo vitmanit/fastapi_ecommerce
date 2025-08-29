@@ -54,7 +54,7 @@ async def create_review(db: Annotated[AsyncSession, Depends(get_db)], product_sl
         user_id=get_user.get('id'),
         product_id=product.id,
         comment=create_review.comment,
-        grade=create_review.grade
+        grade=create_review.rate
     ))
 
     reviews = await db.scalars(select(Review.grade).where(Review.product_id == product.id, Review.is_active == True))
