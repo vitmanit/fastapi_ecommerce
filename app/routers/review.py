@@ -36,6 +36,8 @@ async def products_reviews(db: Annotated[AsyncSession, Depends(get_db)], product
     if not reviews_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active reviews found for this product")
 
+    return reviews_list
+
 @router.post('/{product_slug}/reviews')
 async def create_review(db: Annotated[AsyncSession, Depends(get_db)], product_slug: str, create_review: CreateReview, get_user: Annotated[dict, Depends(get_current_user)]):
     if not get_user.get('is_customer'):
