@@ -135,7 +135,7 @@ async def read_current_user(user: dict = Depends(get_current_user)):
 @router.get('/read_all_users')
 async def read_all_users(db: Annotated[AsyncSession, Depends(get_db)], get_user: Annotated[dict, Depends(get_current_user)]):
     if get_user.get('is_admin'):
-        users = await db.scalars(select(User))
+        users = (await db.scalars(select(User))).all()
         return users
     else:
         raise HTTPException (
